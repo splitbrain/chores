@@ -64,6 +64,7 @@ jobs:
     steps:
       # Watchtower pulls the new image and restarts the container. Without a
       # WATCHTOWER_URL secret, as in a fork, the step succeeds with a note.
+      # All replies other than HTTP 200 make the step fail.
       - env:
           WATCHTOWER_URL: ${{ secrets.WATCHTOWER_URL }}
           WATCHTOWER_TOKEN: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
@@ -75,7 +76,10 @@ jobs:
             echo 'No WATCHTOWER_URL secret set; nothing to deploy.'
             exit 0
           fi
-          answer=$(curl --fail --silent --show-error --max-time 300 \
+          answer="$RUNNER_TEMP/watchtower-answer"
+          status=$(curl --silent --show-error --max-time 300 \
+            --output "$answer" --write-out '%{http_code}' \
             -X POST "$url?image=$IMAGE" \
             -H "Authorization: Bearer ${WATCHTOWER_TOKEN:-}")
-          printf 'Watchtower answered: %s\n' "$answer"
+          printf 'Watchtower answered with HTTP %s: %s\n' "$status" "$(cat "$answer")"
+          [ "$status" = 200 ]
